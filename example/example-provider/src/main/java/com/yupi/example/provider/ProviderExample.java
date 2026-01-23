@@ -13,7 +13,7 @@ public class ProviderExample {
     public static void main(String[] args) {
         // 1. 注册服务
         String serviceName = UserService.class.getName();
-        LocalRegistry.register(serviceName, UserServiceImpl.class);
+        LocalRegistry.registerStatic(serviceName, UserServiceImpl.class);
         
         // 2. 启动HTTP服务器，使用8081端口
         HttpServer server = new VertxHttpServer();

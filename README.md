@@ -1,13 +1,18 @@
 # RPC框架实现
 
-一个基于Java的简单RPC框架，支持远程方法调用、服务注册与发现、序列化与反序列化等核心功能。
+一个基于Java的简单RPC框架，支持远程方法调用、服务注册与发现、序列化与反序列化、负载均衡、容错机制等核心功能。
 
 ## 核心功能
 
 - ✅ 远程方法调用
 - ✅ 本地服务注册与发现
 - ✅ 基于HTTP协议的通信
-- ✅ 支持JDK序列化
+- ✅ 支持多种序列化策略（JDK、JSON、Kryo、Hessian）
+- ✅ 支持多种负载均衡策略（随机、轮询、一致性哈希）
+- ✅ 支持多种重试策略（不重试、固定间隔重试）
+- ✅ 支持多种容错策略（快速失败、失败转移、失败安全、失败恢复）
+- ✅ 基于SPI机制的组件扩展
+- ✅ 双检锁单例模式的配置管理
 - ✅ 完善的错误处理
 - ✅ 详细的日志记录
 
@@ -24,13 +29,20 @@
 ```
 rpc12/
 ├── core/                    # 核心模块
-│   ├── src/main/java/com/yupi/rpc/
+│   ├── src/main/java/com/cyz/rpc/
+│   │   ├── config/         # 配置管理
+│   │   ├── constant/       # 常量定义
+│   │   ├── fault/          # 容错机制
+│   │   │   ├── retry/      # 重试策略
+│   │   │   └── tolerant/   # 容错策略
+│   │   ├── loadbalancer/   # 负载均衡
 │   │   ├── model/          # 数据模型
-│   │   ├── serializer/     # 序列化层
-│   │   ├── registry/       # 注册中心
 │   │   ├── proxy/          # 代理层
+│   │   ├── registry/       # 注册中心
+│   │   ├── serializer/     # 序列化层
 │   │   ├── server/         # 服务器层
-│   │   └── client/         # 客户端层
+│   │   ├── spi/            # SPI机制
+│   │   └── utils/          # 工具类
 │   └── pom.xml
 ├── example/                 # 示例模块
 │   ├── example-common/      # 公共接口
@@ -49,11 +61,33 @@ cd f:\code\rpc\rpc12
 mvn clean install
 ```
 
-### 2. 启动服务提供者
+### 2. 配置文件（application.properties）
+
+在项目resources目录下创建application.properties文件，支持以下配置项：
+
+```properties
+# RPC框架配置
+rpc.name=cyz-rpc
+rpc.version=1.0
+rpc.serverHost=localhost
+rpc.serverPort=8080
+rpc.serializer=jdk
+rpc.loadBalancer=roundRobin
+rpc.retryStrategy=no
+rpc.tolerantStrategy=failFast
+rpc.mock=false
+
+# 注册中心配置
+rpc.registryConfig.registry=local
+rpc.registryConfig.address=http://localhost:2380
+rpc.registryConfig.timeout=10000
+```
+
+### 3. 启动服务提供者
 
 运行 `example-provider` 模块中的 `ProviderExample` 类，启动RPC服务器。
 
-### 3. 运行服务消费者
+### 4. 运行服务消费者
 
 运行 `example-consumer` 模块中的 `ConsumerExample` 类，调用远程服务。
 
@@ -88,7 +122,7 @@ public class UserServiceImpl implements UserService {
 
 ```java
 // 注册服务
-LocalRegistry.register(UserService.class.getName(), UserServiceImpl.class);
+LocalRegistry.registerStatic(UserService.class.getName(), UserServiceImpl.class);
 
 // 启动服务器
 HttpServer server = new VertxHttpServer();
@@ -109,7 +143,7 @@ User user = userService.getUserById(1L);
 
 ### 1. 添加新的序列化器
 
-实现 `Serializer` 接口，并在相应位置使用新的序列化器：
+实现 `Serializer` 接口，并在配置文件中指定：
 
 ```java
 public class JsonSerializer implements Serializer {
@@ -117,9 +151,54 @@ public class JsonSerializer implements Serializer {
 }
 ```
 
-### 2. 使用自定义服务器
+### 2. 添加新的负载均衡器
 
-实现 `HttpServer` 接口，并在启动时使用自定义服务器：
+实现 `LoadBalancer` 接口，并在配置文件中指定：
+
+```java
+public class CustomLoadBalancer implements LoadBalancer {
+    // 实现服务选择方法
+    @Override
+    public ServiceInstance select(List<ServiceInstance> serviceInstances) {
+        // 自定义负载均衡逻辑
+        return serviceInstances.get(0);
+    }
+}
+```
+
+### 3. 添加新的重试策略
+
+实现 `RetryStrategy` 接口，并在配置文件中指定：
+
+```java
+public class CustomRetryStrategy implements RetryStrategy {
+    // 实现重试逻辑
+    @Override
+    public Object doRetry(RetryFunction retryFunction) throws Exception {
+        // 自定义重试策略
+        return retryFunction.apply();
+    }
+}
+```
+
+### 4. 添加新的容错策略
+
+实现 `TolerantStrategy` 接口，并在配置文件中指定：
+
+```java
+public class CustomTolerantStrategy implements TolerantStrategy {
+    // 实现容错逻辑
+    @Override
+    public Object doTolerant(List<Exception> exceptions, Object... args) {
+        // 自定义容错策略
+        return null;
+    }
+}
+```
+
+### 5. 使用自定义服务器
+
+实现 `HttpServer` 接口，并在启动时使用：
 
 ```java
 public class CustomHttpServer implements HttpServer {
@@ -137,21 +216,49 @@ RPC请求模型，包含服务名称、方法名称、参数类型和参数列�
 
 RPC响应模型，包含响应数据、数据类型、响应信息和异常信息。
 
-### 3. Serializer
+### 3. RpcConfig
 
-序列化器接口，定义序列化和反序列化方法。
+RPC框架全局配置，包含服务名称、版本、序列化器、负载均衡器等配置项。
 
-### 4. LocalRegistry
+### 4. RegistryConfig
+
+注册中心配置，包含注册中心类型、地址、超时时间等配置项。
+
+### 5. RpcApplication
+
+RPC框架应用入口，采用双检锁单例模式管理全局配置。
+
+### 6. Serializer
+
+序列化器接口，定义序列化和反序列化方法，支持JDK、JSON、Kryo、Hessian等多种实现。
+
+### 7. LoadBalancer
+
+负载均衡器接口，定义服务选择方法，支持随机、轮询、一致性哈希等多种实现。
+
+### 8. RetryStrategy
+
+重试策略接口，定义重试逻辑，支持不重试、固定间隔重试等实现。
+
+### 9. TolerantStrategy
+
+容错策略接口，定义容错逻辑，支持快速失败、失败转移、失败安全、失败恢复等实现。
+
+### 10. LocalRegistry
 
 本地注册中心，管理服务接口与实现类的映射关系。
 
-### 5. ServiceProxy
+### 11. ServiceProxy
 
 JDK动态代理实现，用于客户端远程调用服务。
 
-### 6. HttpServer
+### 12. HttpServer
 
 HTTP服务器接口，处理客户端请求并调用本地服务。
+
+### 13. SpiLoader
+
+SPI机制实现，用于动态加载组件，支持组件的扩展和替换。
 
 ## 通信流程
 
@@ -170,8 +277,10 @@ HTTP服务器接口，处理客户端请求并调用本地服务。
 | 依赖 | 版本 | 用途 |
 |------|------|------|
 | vertx-core | 4.4.4 | HTTP服务器 |
-| hutool-all | 5.8.18 | HTTP客户端 |
+| hutool-all | 5.8.18 | HTTP客户端和工具库 |
 | lombok | 1.18.30 | 简化代码 |
+| slf4j-api | 1.7.36 | 日志接口 |
+| slf4j-simple | 1.7.36 | 简单日志实现（测试用） |
 
 ## 许可证
 

@@ -1,10 +1,11 @@
 package com.cyz.rpc.server;
 
+import com.cyz.rpc.RpcApplication;
 import com.cyz.rpc.model.RpcRequest;
 import com.cyz.rpc.model.RpcResponse;
 import com.cyz.rpc.registry.LocalRegistry;
-import com.cyz.rpc.serializer.JdkSerializer;
 import com.cyz.rpc.serializer.Serializer;
+import com.cyz.rpc.serializer.SerializerFactory;
 import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
@@ -24,10 +25,13 @@ public class HttpServerHandler implements Handler<HttpServerRequest> {
     private final Serializer serializer;
     
     /**
-     * 默认构造函数，使用JDK序列化器
+     * 默认构造函数，使用配置中的序列化器
      */
     public HttpServerHandler() {
-        this.serializer = new JdkSerializer();
+        // 从配置中获取序列化器类型
+        String serializerType = RpcApplication.getRpcConfig().getSerializer();
+        // 根据类型获取序列化器实例
+        this.serializer = SerializerFactory.getInstance(serializerType);
     }
     
     /**

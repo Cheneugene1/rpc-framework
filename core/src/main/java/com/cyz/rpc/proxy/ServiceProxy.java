@@ -2,10 +2,12 @@ package com.cyz.rpc.proxy;
 
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
+import com.cyz.rpc.RpcApplication;
+import com.cyz.rpc.config.RpcConfig;
 import com.cyz.rpc.model.RpcRequest;
 import com.cyz.rpc.model.RpcResponse;
-import com.cyz.rpc.serializer.JdkSerializer;
 import com.cyz.rpc.serializer.Serializer;
+import com.cyz.rpc.serializer.SerializerFactory;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -17,20 +19,27 @@ import java.lang.reflect.Method;
 public class ServiceProxy implements InvocationHandler {
     
     /**
-     * 服务端地址，默认localhost:8080
+     * 服务端地址，默认从配置中获取
      */
     private final String serverAddress;
     
     /**
-     * 序列化器
+     * 序列化器，从配置中获取
      */
     private final Serializer serializer;
     
     /**
-     * 默认构造函数，使用localhost:8080和JDK序列化器
+     * 默认构造函数，使用配置中的服务器地址和序列化器
      */
     public ServiceProxy() {
-        this("http://localhost:8080");
+        // 获取配置
+        RpcConfig rpcConfig = RpcApplication.getRpcConfig();
+        // 构建服务端地址
+        this.serverAddress = String.format("http://%s:%d", rpcConfig.getServerHost(), rpcConfig.getServerPort());
+        // 从配置中获取序列化器类型
+        String serializerType = rpcConfig.getSerializer();
+        // 根据类型获取序列化器实例
+        this.serializer = SerializerFactory.getInstance(serializerType);
     }
     
     /**
@@ -40,7 +49,10 @@ public class ServiceProxy implements InvocationHandler {
      */
     public ServiceProxy(String serverAddress) {
         this.serverAddress = serverAddress;
-        this.serializer = new JdkSerializer();
+        // 从配置中获取序列化器类型
+        String serializerType = RpcApplication.getRpcConfig().getSerializer();
+        // 根据类型获取序列化器实例
+        this.serializer = SerializerFactory.getInstance(serializerType);
     }
     
     /**

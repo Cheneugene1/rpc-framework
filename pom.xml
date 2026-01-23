@@ -21,6 +21,7 @@
         <vertx.version>4.4.4</vertx.version>
         <hutool.version>5.8.18</hutool.version>
         <lombok.version>1.18.30</lombok.version>
+        <slf4j.version>1.7.36</slf4j.version>
     </properties>
 
     <dependencyManagement>
@@ -45,6 +46,20 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
                 <scope>provided</scope>
+            </dependency>
+
+            <!-- SLF4J 日志框架 -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            
+            <!-- SLF4J 简单实现 -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
